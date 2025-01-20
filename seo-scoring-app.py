@@ -86,6 +86,7 @@ def main():
         type=["csv"]
     )
 
+    # Process the uploaded file
     if uploaded_file:
         # Load the file
         data = pd.read_csv(uploaded_file)
@@ -110,6 +111,7 @@ def main():
 
         # Visualizations for missing metadata
         st.subheader("Missing Metadata Insights")
+        # Use `data` to calculate missing metadata
         missing_data = {
             "Missing Titles": data["Title 1"].isnull().sum(),
             "Missing Meta Descriptions": data["Meta Description 1"].isnull().sum(),
