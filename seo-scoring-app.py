@@ -1,235 +1,128 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import json
-from datetime import datetime
-import base64
-import io
+import os
 
-class SEOScorer:
-    # [Previous SEOScorer class code remains the same]
-    def __init__(self):
-        self.weights = {
-            'content_seo': 0.3,
-            'technical_seo': 0.3,
-            'user_experience': 0.2,
-            'off_page_seo': 0.2
-        }
+# Define static benchmarks
+benchmarks = {
+    "Content SEO": 30,  # out of 40
+    "Technical SEO": 20,  # out of 30
+    "UX Score": 15,  # out of 30
+    "Total Score": 65  # out of 100
+}
 
-    def analyze_content_seo(self, html_report):
-        scores = {}
-        
-        # Meta Title & Description
-        meta_titles = html_report['Title'].notna().mean() * 100
-        meta_desc = html_report['Meta Description'].notna().mean() * 100
-        scores['meta_optimization'] = (meta_titles + meta_desc) / 2
-        
-        # Internal Linking
-        internal_links = html_report['Internal Out Links'].notna().mean() * 100
-        scores['internal_linking'] = internal_links
-        
-        # Image Alt Text
-        if 'Images' in html_report.columns:
-            alt_text = html_report['Images'].notna().mean() * 100
-            scores['image_alt'] = alt_text
-        else:
-            scores['image_alt'] = 0
-            
-        # Calculate overall content score
-        content_score = np.mean(list(scores.values()))
-        return content_score, scores
-
-    def analyze_technical_seo(self, speed_report):
-        scores = {}
-        
-        # Speed Scores
-        mobile_speed = float(speed_report['Mobile Score'].iloc[0]) if 'Mobile Score' in speed_report.columns else 0
-        desktop_speed = float(speed_report['Desktop Score'].iloc[0]) if 'Desktop Score' in speed_report.columns else 0
-        
-        scores['mobile_speed'] = self.calculate_speed_score(mobile_speed)
-        scores['desktop_speed'] = self.calculate_speed_score(desktop_speed)
-        
-        technical_score = np.mean(list(scores.values()))
-        return technical_score, scores
-
-    def analyze_user_experience(self, html_report):
-        scores = {}
-        
-        # Mobile Friendliness (checking viewport meta tag)
-        mobile_friendly = html_report['Meta Viewport'].notna().mean() * 100
-        scores['mobile_friendly'] = mobile_friendly
-        
-        # Rich Results (checking schema markup)
-        rich_results = html_report['Schema Types'].notna().mean() * 100 if 'Schema Types' in html_report.columns else 0
-        scores['rich_results'] = rich_results
-        
-        ux_score = np.mean(list(scores.values()))
-        return ux_score, scores
-
-    def calculate_speed_score(self, speed_value):
-        if speed_value >= 90: return 100
-        elif speed_value >= 80: return 80
-        elif speed_value >= 70: return 60
-        elif speed_value >= 50: return 40
-        else: return 20
-
-    def calculate_overall_score(self, content_score, technical_score, ux_score):
-        weighted_scores = {
-            'Content SEO': content_score * self.weights['content_seo'],
-            'Technical SEO': technical_score * self.weights['technical_seo'],
-            'User Experience': ux_score * self.weights['user_experience']
-        }
-        
-        return sum(weighted_scores.values()) / (sum(self.weights.values()) - self.weights['off_page_seo']) * 100
-
-def generate_excel_report(content_score, content_details, technical_score, technical_details, 
-                         ux_score, ux_details, overall_score):
-    """Generate Excel report with all SEO scores"""
-    output = io.BytesIO()
+# Scoring Logic Function
+def calculate_scores(file):
+    # Read the uploaded CSV file
+    data = pd.read_csv(file)
     
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        # Summary sheet
-        summary_data = {
-            'Category': ['Content SEO', 'Technical SEO', 'User Experience', 'Overall Score'],
-            'Score': [content_score, technical_score, ux_score, overall_score]
-        }
-        summary_df = pd.DataFrame(summary_data)
-        summary_df.to_excel(writer, sheet_name='Summary', index=False)
-        
-        # Detailed scores sheets
-        content_df = pd.DataFrame(list(content_details.items()), columns=['Metric', 'Score'])
-        content_df.to_excel(writer, sheet_name='Content SEO Details', index=False)
-        
-        technical_df = pd.DataFrame(list(technical_details.items()), columns=['Metric', 'Score'])
-        technical_df.to_excel(writer, sheet_name='Technical SEO Details', index=False)
-        
-        ux_df = pd.DataFrame(list(ux_details.items()), columns=['Metric', 'Score'])
-        ux_df.to_excel(writer, sheet_name='UX Details', index=False)
-        
-    return output.getvalue()
+    # Initialize scores
+    content_score = 0
+    technical_score = 0
+    ux_score = 0
 
-def generate_json_report(content_score, content_details, technical_score, technical_details,
-                        ux_score, ux_details, overall_score):
-    """Generate JSON report with all SEO scores"""
-    report = {
-        'timestamp': datetime.now().isoformat(),
-        'overall_score': float(overall_score),
-        'categories': {
-            'content_seo': {
-                'score': float(content_score),
-                'details': {k: float(v) for k, v in content_details.items()}
-            },
-            'technical_seo': {
-                'score': float(technical_score),
-                'details': {k: float(v) for k, v in technical_details.items()}
-            },
-            'user_experience': {
-                'score': float(ux_score),
-                'details': {k: float(v) for k, v in ux_details.items()}
-            }
-        }
+    # Content SEO Scoring
+    if 'Missing Title Tags.csv' in file.name:
+        missing_titles = len(data)
+        if missing_titles == 0:
+            content_score += 10  # Fully optimized
+        elif missing_titles < 5:
+            content_score += 5
+
+    if 'Missing Meta Descriptions.csv' in file.name:
+        missing_meta = len(data)
+        if missing_meta == 0:
+            content_score += 10
+        elif missing_meta < 5:
+            content_score += 5
+
+    if 'Images Missing Alt Text.csv' in file.name:
+        missing_alt = len(data)
+        if missing_alt == 0:
+            content_score += 5
+        elif missing_alt < 10:
+            content_score += 2.5
+
+    # UX Scoring Example
+    if 'Mobile Usability Issues.csv' in file.name:
+        mobile_issues = len(data)
+        if mobile_issues == 0:
+            ux_score += 10
+        elif mobile_issues < 5:
+            ux_score += 5
+
+    # Total score
+    total_score = content_score + technical_score + ux_score
+    return {
+        "File": file.name,
+        "Content SEO Score": content_score,
+        "Technical SEO Score": technical_score,
+        "UX Score": ux_score,
+        "Total Score": total_score
     }
-    return json.dumps(report, indent=2)
 
+# Add benchmark comparisons
+def add_benchmarks(result):
+    result["Content Benchmark"] = "Below" if result["Content SEO Score"] < benchmarks["Content SEO"] else "Above"
+    result["Technical Benchmark"] = "Below" if result["Technical SEO Score"] < benchmarks["Technical SEO"] else "Above"
+    result["UX Benchmark"] = "Below" if result["UX Score"] < benchmarks["UX Score"] else "Above"
+    result["Overall Benchmark"] = "Below" if result["Total Score"] < benchmarks["Total Score"] else "Above"
+    return result
+
+# Streamlit App
 def main():
-    st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
-    
-    st.title("SEO Readiness Score Calculator")
-    st.write("Upload your Screaming Frog exports to analyze SEO readiness")
-    
-    # File uploaders
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        html_file = st.file_uploader("Upload Internal HTML Report (CSV)", type=['csv'])
-    with col2:
-        speed_file = st.file_uploader("Upload Site Speed Report (CSV)", type=['csv'])
-    
-    if html_file and speed_file:
-        try:
-            # Load data
-            html_report = pd.read_csv(html_file)
-            speed_report = pd.read_csv(speed_file)
-            
-            # Initialize scorer
-            scorer = SEOScorer()
-            
-            # Calculate scores
-            content_score, content_details = scorer.analyze_content_seo(html_report)
-            technical_score, technical_details = scorer.analyze_technical_seo(speed_report)
-            ux_score, ux_details = scorer.analyze_user_experience(html_report)
-            
-            overall_score = scorer.calculate_overall_score(content_score, technical_score, ux_score)
-            
-            # Display results
-            st.header("SEO Readiness Scores")
-            
-            # Create three columns for scores
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("Content SEO Score", f"{content_score:.1f}/100")
-                st.subheader("Content Details")
-                for metric, score in content_details.items():
-                    st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
-            
-            with col2:
-                st.metric("Technical SEO Score", f"{technical_score:.1f}/100")
-                st.subheader("Technical Details")
-                for metric, score in technical_details.items():
-                    st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
-            
-            with col3:
-                st.metric("User Experience Score", f"{ux_score:.1f}/100")
-                st.subheader("UX Details")
-                for metric, score in ux_details.items():
-                    st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
-            
-            # Overall score at the bottom
-            st.header("Overall SEO Readiness Score")
-            st.metric("Final Score", f"{overall_score:.1f}/100")
-            
-            # Export section
-            st.header("Export Results")
-            
-            # Generate reports
-            excel_report = generate_excel_report(
-                content_score, content_details,
-                technical_score, technical_details,
-                ux_score, ux_details,
-                overall_score
-            )
-            
-            json_report = generate_json_report(
-                content_score, content_details,
-                technical_score, technical_details,
-                ux_score, ux_details,
-                overall_score
-            )
-            
-            col1, col2 = st.columns(2)
-            
-            # Excel download button
-            with col1:
-                st.download_button(
-                    label="Download Excel Report",
-                    data=excel_report,
-                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            
-            # JSON download button
-            with col2:
-                st.download_button(
-                    label="Download JSON Report",
-                    data=json_report,
-                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json"
-                )
-            
-        except Exception as e:
-            st.error(f"Error processing files: {str(e)}")
-            st.write("Please make sure you're uploading the correct Screaming Frog export files.")
+    st.title("SEO Competitor Scoring Tool")
+    st.write("Upload your Screaming Frog audit files to calculate SEO scores dynamically.")
 
+    # File uploader
+    uploaded_files = st.file_uploader(
+        "Upload Screaming Frog CSV files", 
+        type=["csv"], 
+        accept_multiple_files=True
+    )
+
+    # Results list
+    results = []
+
+    # Process files when uploaded
+    if uploaded_files:
+        for file in uploaded_files:
+            # Calculate scores for each uploaded file
+            result = calculate_scores(file)
+            result = add_benchmarks(result)
+            results.append(result)
+
+        # Convert results to DataFrame for display
+        results_df = pd.DataFrame(results)
+
+        # Display results
+        st.subheader("SEO Scoring Results with Benchmarks")
+        st.dataframe(results_df)
+
+        # Highlight below-benchmark scores
+        st.subheader("Competitor Performance vs Benchmarks")
+        below_benchmark = results_df[
+            (results_df["Content Benchmark"] == "Below") |
+            (results_df["Technical Benchmark"] == "Below") |
+            (results_df["UX Benchmark"] == "Below")
+        ]
+        st.dataframe(below_benchmark)
+
+        # Visualizations
+        st.subheader("Score Comparison")
+        st.bar_chart(results_df.set_index("File")[["Content SEO Score", "Technical SEO Score", "UX Score"]])
+
+        # Download results as Excel
+        st.subheader("Download Results")
+        output_file = "seo_scores_report.xlsx"
+        results_df.to_excel(output_file, index=False)
+        with open(output_file, "rb") as f:
+            st.download_button(
+                label="Download Excel Report",
+                data=f,
+                file_name=output_file,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+# Run the app
 if __name__ == "__main__":
     main()
