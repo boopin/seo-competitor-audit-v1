@@ -10,7 +10,10 @@ benchmarks = {
 }
 
 # Scoring Logic for internal_html.csv
-def calculate_scores_from_internal_html(data):
+def calculate_scores_from_internal_html(file):
+    # Load the CSV file
+    data = pd.read_csv(file)
+
     # Initialize scores
     content_score = 0
     technical_score = 0
@@ -57,6 +60,7 @@ def calculate_scores_from_internal_html(data):
     # Total score
     total_score = content_score + technical_score + ux_score
     return {
+        "File": file.name,
         "Content SEO Score": content_score,
         "Technical SEO Score": technical_score,
         "UX Score": ux_score,
@@ -82,14 +86,12 @@ def main():
         type=["csv"]
     )
 
-    # Process the uploaded file
     if uploaded_file:
-        # Load the file efficiently
-        try:
-            data = pd.read_csv(uploaded_file, low_memory=False)
-        except Exception as e:
-            st.error(f"Error reading file: {e}")
-            return
+        # Load the file
+        data = pd.read_csv(uploaded_file)
+
+        # Debugging: Show column names
+        st.write("Uploaded file columns:", data.columns.tolist())
 
         # Check for required columns
         required_columns = ["Title 1", "Meta Description 1", "H1-1", "Status Code", "Inlinks"]
@@ -98,8 +100,8 @@ def main():
             st.error(f"The following required columns are missing: {', '.join(missing_columns)}")
             return
 
-        # Calculate scores
-        result = calculate_scores_from_internal_html(data)
+        # Process internal_html.csv file
+        result = calculate_scores_from_internal_html(uploaded_file)
         result = add_benchmarks(result)
         
         # Display results
