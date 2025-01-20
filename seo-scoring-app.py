@@ -77,49 +77,28 @@ def add_benchmarks(result):
 
 # Streamlit App
 def main():
-    st.title("SEO Competitor Scoring Tool")
-    st.write("Upload your Screaming Frog audit files (e.g., `internal_html.csv`) to calculate SEO scores dynamically.")
+    st.title("SEO Competitor Scoring Tool (Single File - internal_html.csv)")
+    st.write("Upload your Screaming Frog `internal_html.csv` file to calculate SEO scores dynamically.")
 
     # File uploader
-    uploaded_files = st.file_uploader(
-        "Upload Screaming Frog CSV files", 
-        type=["csv"], 
-        accept_multiple_files=True
+    uploaded_file = st.file_uploader(
+        "Upload Screaming Frog internal_html.csv file", 
+        type=["csv"]
     )
 
     # Results list
-    results = []
-
-    # Process files when uploaded
-    if uploaded_files:
-        for file in uploaded_files:
-            if "internal_html.csv" in file.name:
-                # Use the scoring function for internal_html.csv
-                result = calculate_scores_from_internal_html(file)
-            else:
-                # Handle other Screaming Frog files here if needed
-                st.warning(f"File {file.name} is not supported yet.")
-                continue
-
-            result = add_benchmarks(result)
-            results.append(result)
-
-        # Convert results to DataFrame and display
-        results_df = pd.DataFrame(results)
+    if uploaded_file:
+        # Process internal_html.csv file
+        result = calculate_scores_from_internal_html(uploaded_file)
+        result = add_benchmarks(result)
+        
+        # Display results
         st.subheader("SEO Scoring Results with Benchmarks")
-        st.dataframe(results_df)
+        st.write(result)
 
-        # Highlight below-benchmark scores
-        st.subheader("Competitor Performance vs Benchmarks")
-        below_benchmark = results_df[
-            (results_df["Content Benchmark"] == "Below") |
-            (results_df["Technical Benchmark"] == "Below") |
-            (results_df["UX Benchmark"] == "Below")
-        ]
-        st.dataframe(below_benchmark)
-
-        # Visualizations
+        # Visualizations for missing metadata
         st.subheader("Missing Metadata Insights")
+        data = pd.read_csv(uploaded_file)
         missing_data = {
             "Missing Titles": data["Title 1"].isnull().sum(),
             "Missing Meta Descriptions": data["Meta Description 1"].isnull().sum(),
@@ -129,6 +108,7 @@ def main():
 
         # Download results as Excel
         st.subheader("Download Results")
+        results_df = pd.DataFrame([result])
         output_file = "seo_scores_report.xlsx"
         results_df.to_excel(output_file, index=False)
         with open(output_file, "rb") as f:
