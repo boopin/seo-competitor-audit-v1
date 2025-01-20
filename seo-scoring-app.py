@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import os
 
 # Define static benchmarks
 benchmarks = {
@@ -10,45 +9,53 @@ benchmarks = {
     "Total Score": 65  # out of 100
 }
 
-# Scoring Logic Function
-def calculate_scores(file):
-    # Read the uploaded CSV file
+# Scoring Logic for internal_html.csv
+def calculate_scores_from_internal_html(file):
+    # Load the CSV file
     data = pd.read_csv(file)
-    
+
     # Initialize scores
     content_score = 0
     technical_score = 0
     ux_score = 0
 
     # Content SEO Scoring
-    if 'Missing Title Tags.csv' in file.name:
-        missing_titles = len(data)
-        if missing_titles == 0:
-            content_score += 10  # Fully optimized
-        elif missing_titles < 5:
-            content_score += 5
+    # Check for missing titles
+    missing_titles = data["Title 1"].isnull().sum()
+    if missing_titles == 0:
+        content_score += 10  # Fully optimized
+    elif missing_titles < 5:
+        content_score += 5  # Partially optimized
 
-    if 'Missing Meta Descriptions.csv' in file.name:
-        missing_meta = len(data)
-        if missing_meta == 0:
-            content_score += 10
-        elif missing_meta < 5:
-            content_score += 5
+    # Check for missing meta descriptions
+    missing_meta = data["Meta Description 1"].isnull().sum()
+    if missing_meta == 0:
+        content_score += 10
+    elif missing_meta < 5:
+        content_score += 5
 
-    if 'Images Missing Alt Text.csv' in file.name:
-        missing_alt = len(data)
-        if missing_alt == 0:
-            content_score += 5
-        elif missing_alt < 10:
-            content_score += 2.5
+    # Check for missing H1 tags
+    missing_h1 = data["H1-1"].isnull().sum()
+    if missing_h1 == 0:
+        content_score += 5
+    elif missing_h1 < 10:
+        content_score += 2.5
 
-    # UX Scoring Example
-    if 'Mobile Usability Issues.csv' in file.name:
-        mobile_issues = len(data)
-        if mobile_issues == 0:
-            ux_score += 10
-        elif mobile_issues < 5:
-            ux_score += 5
+    # Technical SEO Scoring
+    # Count 2xx status codes
+    valid_status = data["Status Code"].value_counts().get(200, 0)
+    if valid_status == len(data):
+        technical_score += 10  # All pages valid
+    elif valid_status / len(data) > 0.9:
+        technical_score += 5  # Most pages valid
+
+    # UX Scoring
+    # Calculate average inlinks
+    average_inlinks = data["Inlinks"].mean()
+    if average_inlinks >= 10:
+        ux_score += 10
+    elif average_inlinks >= 5:
+        ux_score += 5
 
     # Total score
     total_score = content_score + technical_score + ux_score
@@ -71,7 +78,7 @@ def add_benchmarks(result):
 # Streamlit App
 def main():
     st.title("SEO Competitor Scoring Tool")
-    st.write("Upload your Screaming Frog audit files to calculate SEO scores dynamically.")
+    st.write("Upload your Screaming Frog audit files (e.g., `internal_html.csv`) to calculate SEO scores dynamically.")
 
     # File uploader
     uploaded_files = st.file_uploader(
@@ -86,15 +93,19 @@ def main():
     # Process files when uploaded
     if uploaded_files:
         for file in uploaded_files:
-            # Calculate scores for each uploaded file
-            result = calculate_scores(file)
+            if "internal_html.csv" in file.name:
+                # Use the scoring function for internal_html.csv
+                result = calculate_scores_from_internal_html(file)
+            else:
+                # Handle other Screaming Frog files here if needed
+                st.warning(f"File {file.name} is not supported yet.")
+                continue
+
             result = add_benchmarks(result)
             results.append(result)
 
-        # Convert results to DataFrame for display
+        # Convert results to DataFrame and display
         results_df = pd.DataFrame(results)
-
-        # Display results
         st.subheader("SEO Scoring Results with Benchmarks")
         st.dataframe(results_df)
 
@@ -108,8 +119,13 @@ def main():
         st.dataframe(below_benchmark)
 
         # Visualizations
-        st.subheader("Score Comparison")
-        st.bar_chart(results_df.set_index("File")[["Content SEO Score", "Technical SEO Score", "UX Score"]])
+        st.subheader("Missing Metadata Insights")
+        missing_data = {
+            "Missing Titles": data["Title 1"].isnull().sum(),
+            "Missing Meta Descriptions": data["Meta Description 1"].isnull().sum(),
+            "Missing H1 Tags": data["H1-1"].isnull().sum()
+        }
+        st.bar_chart(pd.Series(missing_data))
 
         # Download results as Excel
         st.subheader("Download Results")
