@@ -86,8 +86,20 @@ def main():
         type=["csv"]
     )
 
-    # Results list
     if uploaded_file:
+        # Load the file
+        data = pd.read_csv(uploaded_file)
+
+        # Debugging: Show column names
+        st.write("Uploaded file columns:", data.columns.tolist())
+
+        # Check for required columns
+        required_columns = ["Title 1", "Meta Description 1", "H1-1", "Status Code", "Inlinks"]
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            st.error(f"The following required columns are missing: {', '.join(missing_columns)}")
+            return
+
         # Process internal_html.csv file
         result = calculate_scores_from_internal_html(uploaded_file)
         result = add_benchmarks(result)
@@ -98,7 +110,6 @@ def main():
 
         # Visualizations for missing metadata
         st.subheader("Missing Metadata Insights")
-        data = pd.read_csv(uploaded_file)
         missing_data = {
             "Missing Titles": data["Title 1"].isnull().sum(),
             "Missing Meta Descriptions": data["Meta Description 1"].isnull().sum(),
