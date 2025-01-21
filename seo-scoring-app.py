@@ -106,29 +106,40 @@ class SEOScorer:
             speed_score = fast_pages.mean() * 100
         scores['page_speed'] = round(speed_score)
 
-        # Content Readability
-        readability_score = 0
-        if 'Flesch Reading Ease Score' in df.columns:
-            good_readability = df['Flesch Reading Ease Score'] >= 60
-            readability_score = good_readability.mean() * 100
-        scores['readability'] = round(readability_score)
-
         return round(np.mean(list(scores.values()))), scores
 
+    def calculate_tiered_score(self, score):
+        if score >= 90:
+            return 1  # Full weight
+        elif score >= 50:
+            return 0.5  # Half weight
+        else:
+            return 0  # Zero weight
+
     def calculate_overall_score(self, content_score, technical_score, ux_score):
-        # Normalize the input scores to 0-1 scale since they come in as 0-100
+        # Normalize input scores to 0-1 scale
         content_score = content_score / 100
         technical_score = technical_score / 100
         ux_score = ux_score / 100
 
+        # Weighted aggregation
         weighted_scores = {
             'Content SEO': content_score * self.weights['content_seo'],
             'Technical SEO': technical_score * self.weights['technical_seo'],
             'User Experience': ux_score * self.weights['user_experience']
         }
 
-        # Calculate final score on 0-100 scale
-        return round(sum(weighted_scores.values()) / (sum(self.weights.values()) - self.weights['off_page_seo']) * 100)
+        overall_score = sum(weighted_scores.values()) / sum(self.weights.values()) * 100
+
+        # Categorize score into Good, Medium, or Bad
+        if overall_score >= 90:
+            category = "Good"
+        elif overall_score >= 50:
+            category = "Medium"
+        else:
+            category = "Bad"
+
+        return round(overall_score), category
 
 def main():
     st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
@@ -154,7 +165,7 @@ def main():
             technical_score, technical_details = scorer.analyze_technical_seo(df)
             ux_score, ux_details = scorer.analyze_user_experience(df)
 
-            overall_score = scorer.calculate_overall_score(content_score, technical_score, ux_score)
+            overall_score, category = scorer.calculate_overall_score(content_score, technical_score, ux_score)
 
             # Display results
             st.header("SEO Readiness Scores")
@@ -181,12 +192,14 @@ def main():
 
             st.header("Overall SEO Readiness Score")
             st.metric("Final Score", f"{overall_score}/100")
+            st.write(f"Category: {category}")
 
             # Export functionality
             if st.button("Generate Report"):
                 report_data = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "overall_score": int(overall_score),
+                    "category": category,
                     "scores": {
                         "content_seo": {
                             "total": int(content_score),
@@ -217,7 +230,8 @@ def main():
                 with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                     summary_df = pd.DataFrame({
                         'Metric': ['Content SEO', 'Technical SEO', 'User Experience', 'Overall Score'],
-                        'Score': [content_score, technical_score, ux_score, overall_score]
+                        'Score': [content_score, technical_score, ux_score, overall_score],
+                        'Category': [None, None, None, category]
                     })
                     summary_df.to_excel(writer, index=False, sheet_name='Summary')
 
