@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import json
 from datetime import datetime
+from io import BytesIO
 
 class SEOScorer:
     def __init__(self):
@@ -202,7 +203,7 @@ def main():
                     }
                 }
 
-                # Create download button for JSON report
+                # JSON export
                 json_str = json.dumps(report_data, indent=2)
                 st.download_button(
                     label="Download Report (JSON)",
@@ -211,10 +212,32 @@ def main():
                     mime="application/json"
                 )
 
+                # Excel export
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    summary_df = pd.DataFrame({
+                        'Metric': ['Content SEO', 'Technical SEO', 'User Experience', 'Overall Score'],
+                        'Score': [content_score, technical_score, ux_score, overall_score]
+                    })
+                    summary_df.to_excel(writer, index=False, sheet_name='Summary')
+
+                    details_df = pd.DataFrame.from_dict({
+                        'Content SEO': content_details,
+                        'Technical SEO': technical_details,
+                        'User Experience': ux_details
+                    }, orient='index').transpose()
+                    details_df.to_excel(writer, index=False, sheet_name='Details')
+
+                st.download_button(
+                    label="Download Report (XLSX)",
+                    data=output.getvalue(),
+                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
             st.write("Please make sure you're uploading the correct Screaming Frog export file.")
 
 if __name__ == "__main__":
     main()
-
