@@ -22,7 +22,7 @@ class SEOScorer:
             valid_titles = df['Title 1'].notna()
             good_length = (df['Title 1 Length'] >= 30) & (df['Title 1 Length'] <= 60)
             title_score = ((valid_titles & good_length).mean() * 100)
-        scores['meta_title'] = round(title_score, 1)
+        scores['meta_title'] = round(title_score)
 
         # Meta Description Analysis
         desc_score = 0
@@ -30,13 +30,13 @@ class SEOScorer:
             valid_desc = df['Meta Description 1'].notna()
             good_length = (df['Meta Description 1 Length'] >= 120) & (df['Meta Description 1 Length'] <= 160)
             desc_score = ((valid_desc & good_length).mean() * 100)
-        scores['meta_description'] = round(desc_score, 1)
+        scores['meta_description'] = round(desc_score)
 
         # Heading Structure
         h1_score = 0
         if 'H1-1' in df.columns:
             h1_score = df['H1-1'].notna().mean() * 100
-        scores['h1_tags'] = round(h1_score, 1)
+        scores['h1_tags'] = round(h1_score)
 
         # Internal Linking
         internal_linking_score = 0
@@ -44,7 +44,7 @@ class SEOScorer:
             has_inlinks = df['Inlinks'] > 0
             has_unique_inlinks = df['Unique Inlinks'] > 0
             internal_linking_score = ((has_inlinks & has_unique_inlinks).mean() * 100)
-        scores['internal_linking'] = round(internal_linking_score, 1)
+        scores['internal_linking'] = round(internal_linking_score)
 
         # Content Quality
         content_quality_score = 0
@@ -52,9 +52,9 @@ class SEOScorer:
             good_length = df['Word Count'] >= 300
             readable = df['Flesch Reading Ease Score'] >= 60
             content_quality_score = ((good_length & readable).mean() * 100)
-        scores['content_quality'] = round(content_quality_score, 1)
+        scores['content_quality'] = round(content_quality_score)
 
-        return round(np.mean(list(scores.values())), 1), scores
+        return round(np.mean(list(scores.values()))), scores
 
     def analyze_technical_seo(self, df):
         scores = {}
@@ -64,30 +64,30 @@ class SEOScorer:
         if 'Response Time' in df.columns:
             good_response = df['Response Time'] <= 1.0  # 1 second threshold
             response_score = good_response.mean() * 100
-        scores['response_time'] = round(response_score, 1)
+        scores['response_time'] = round(response_score)
 
         # Status Code Analysis
         status_score = 0
         if 'Status Code' in df.columns:
             good_status = df['Status Code'] == 200
             status_score = good_status.mean() * 100
-        scores['status_codes'] = round(status_score, 1)
+        scores['status_codes'] = round(status_score)
 
         # Indexability
         index_score = 0
         if 'Indexability' in df.columns:
             indexable = df['Indexability'] == 'Indexable'
             index_score = indexable.mean() * 100
-        scores['indexability'] = round(index_score, 1)
+        scores['indexability'] = round(index_score)
 
         # Canonical Implementation
         canonical_score = 0
         if 'Canonical Link Element 1' in df.columns:
             valid_canonical = df['Canonical Link Element 1'].notna()
             canonical_score = valid_canonical.mean() * 100
-        scores['canonical_tags'] = round(canonical_score, 1)
+        scores['canonical_tags'] = round(canonical_score)
 
-        return round(np.mean(list(scores.values())), 1), scores
+        return round(np.mean(list(scores.values()))), scores
 
     def analyze_user_experience(self, df):
         scores = {}
@@ -96,23 +96,23 @@ class SEOScorer:
         mobile_score = 0
         if 'Mobile Alternate Link' in df.columns:
             mobile_score = df['Mobile Alternate Link'].notna().mean() * 100
-        scores['mobile_friendly'] = round(mobile_score, 1)
+        scores['mobile_friendly'] = round(mobile_score)
 
         # Page Speed (based on response time as proxy)
         speed_score = 0
         if 'Response Time' in df.columns:
             fast_pages = df['Response Time'] <= 0.5  # 500ms threshold
             speed_score = fast_pages.mean() * 100
-        scores['page_speed'] = round(speed_score, 1)
+        scores['page_speed'] = round(speed_score)
 
         # Content Readability
         readability_score = 0
         if 'Flesch Reading Ease Score' in df.columns:
             good_readability = df['Flesch Reading Ease Score'] >= 60
             readability_score = good_readability.mean() * 100
-        scores['readability'] = round(readability_score, 1)
+        scores['readability'] = round(readability_score)
 
-        return round(np.mean(list(scores.values())), 1), scores
+        return round(np.mean(list(scores.values()))), scores
 
     def calculate_overall_score(self, content_score, technical_score, ux_score):
         # Normalize the input scores to 0-1 scale since they come in as 0-100
@@ -127,7 +127,7 @@ class SEOScorer:
         }
 
         # Calculate final score on 0-100 scale
-        return round(sum(weighted_scores.values()) / (sum(self.weights.values()) - self.weights['off_page_seo']) * 100, 1)
+        return round(sum(weighted_scores.values()) / (sum(self.weights.values()) - self.weights['off_page_seo']) * 100)
 
 def main():
     st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
@@ -161,43 +161,43 @@ def main():
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric("Content SEO Score", f"{content_score:.1f}/100")
+                st.metric("Content SEO Score", f"{content_score}/100")
                 st.subheader("Content Details")
                 for metric, score in content_details.items():
-                    st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
+                    st.write(f"{metric.replace('_', ' ').title()}: {score}/100")
 
             with col2:
-                st.metric("Technical SEO Score", f"{technical_score:.1f}/100")
+                st.metric("Technical SEO Score", f"{technical_score}/100")
                 st.subheader("Technical Details")
                 for metric, score in technical_details.items():
-                    st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
+                    st.write(f"{metric.replace('_', ' ').title()}: {score}/100")
 
             with col3:
-                st.metric("User Experience Score", f"{ux_score:.1f}/100")
+                st.metric("User Experience Score", f"{ux_score}/100")
                 st.subheader("UX Details")
                 for metric, score in ux_details.items():
-                    st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
+                    st.write(f"{metric.replace('_', ' ').title()}: {score}/100")
 
             st.header("Overall SEO Readiness Score")
-            st.metric("Final Score", f"{overall_score:.1f}/100")
+            st.metric("Final Score", f"{overall_score}/100")
 
             # Export functionality
             if st.button("Generate Report"):
                 report_data = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "overall_score": float(overall_score),
+                    "overall_score": int(overall_score),
                     "scores": {
                         "content_seo": {
-                            "total": float(content_score),
-                            "details": {k: float(v) for k, v in content_details.items()}
+                            "total": int(content_score),
+                            "details": {k: int(v) for k, v in content_details.items()}
                         },
                         "technical_seo": {
-                            "total": float(technical_score),
-                            "details": {k: float(v) for k, v in technical_details.items()}
+                            "total": int(technical_score),
+                            "details": {k: int(v) for k, v in technical_details.items()}
                         },
                         "user_experience": {
-                            "total": float(ux_score),
-                            "details": {k: float(v) for k, v in ux_details.items()}
+                            "total": int(ux_score),
+                            "details": {k: int(v) for k, v in ux_details.items()}
                         }
                     }
                 }
