@@ -1,6 +1,5 @@
-streamlit>=1.24.0
-pandas>=1.5.0
-numpy>=1.23.0
-plotly>=5.13.0
-xlsxwriter>=3.0.0
-seaborn>=0.12.0
+streamlit==1.31.1
+pandas==2.2.0
+numpy==1.26.3
+xlsxwriter==3.1.9
+openpyxl==3.1.2
