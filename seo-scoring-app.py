@@ -15,7 +15,7 @@ class SEOScorer:
 
     def analyze_content_seo(self, df):
         scores = {}
-        
+
         # Meta Title Analysis
         title_score = 0
         if 'Title 1' in df.columns and 'Title 1 Length' in df.columns:
@@ -58,7 +58,7 @@ class SEOScorer:
 
     def analyze_technical_seo(self, df):
         scores = {}
-        
+
         # Response Time Analysis
         response_score = 0
         if 'Response Time' in df.columns:
@@ -91,7 +91,7 @@ class SEOScorer:
 
     def analyze_user_experience(self, df):
         scores = {}
-        
+
         # Mobile Friendliness
         mobile_score = 0
         if 'Mobile Alternate Link' in df.columns:
@@ -115,58 +115,65 @@ class SEOScorer:
         return np.mean(list(scores.values())), scores
 
     def calculate_overall_score(self, content_score, technical_score, ux_score):
+        # Normalize the input scores to 0-1 scale since they come in as 0-100
+        content_score = content_score / 100
+        technical_score = technical_score / 100
+        ux_score = ux_score / 100
+
         weighted_scores = {
             'Content SEO': content_score * self.weights['content_seo'],
             'Technical SEO': technical_score * self.weights['technical_seo'],
             'User Experience': ux_score * self.weights['user_experience']
         }
+
+        # Calculate final score on 0-100 scale
         return sum(weighted_scores.values()) / (sum(self.weights.values()) - self.weights['off_page_seo']) * 100
 
 def main():
     st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
-    
+
     st.title("SEO Readiness Score Calculator")
     st.write("Upload your Screaming Frog exports to analyze SEO readiness")
-    
+
     uploaded_file = st.file_uploader("Upload Internal HTML Report (CSV)", type=['csv'])
-    
+
     if uploaded_file:
         try:
             df = pd.read_csv(uploaded_file)
-            
+
             # Initialize scorer
             scorer = SEOScorer()
-            
+
             # Calculate scores
             content_score, content_details = scorer.analyze_content_seo(df)
             technical_score, technical_details = scorer.analyze_technical_seo(df)
             ux_score, ux_details = scorer.analyze_user_experience(df)
-            
+
             overall_score = scorer.calculate_overall_score(content_score, technical_score, ux_score)
-            
+
             # Display results
             st.header("SEO Readiness Scores")
-            
+
             col1, col2, col3 = st.columns(3)
-            
+
             with col1:
                 st.metric("Content SEO Score", f"{content_score:.1f}/100")
                 st.subheader("Content Details")
                 for metric, score in content_details.items():
                     st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
-            
+
             with col2:
                 st.metric("Technical SEO Score", f"{technical_score:.1f}/100")
                 st.subheader("Technical Details")
                 for metric, score in technical_details.items():
                     st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
-            
+
             with col3:
                 st.metric("User Experience Score", f"{ux_score:.1f}/100")
                 st.subheader("UX Details")
                 for metric, score in ux_details.items():
                     st.write(f"{metric.replace('_', ' ').title()}: {score:.1f}/100")
-            
+
             st.header("Overall SEO Readiness Score")
             st.metric("Final Score", f"{overall_score:.1f}/100")
 
@@ -190,7 +197,7 @@ def main():
                         }
                     }
                 }
-                
+
                 # Create download button for JSON report
                 json_str = json.dumps(report_data, indent=2)
                 st.download_button(
@@ -199,7 +206,7 @@ def main():
                     file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
                     mime="application/json"
                 )
-                
+
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
             st.write("Please make sure you're uploading the correct Screaming Frog export file.")
