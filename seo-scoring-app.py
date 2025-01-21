@@ -1,180 +1,289 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import json
 from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
+from io import BytesIO
+import xlsxwriter
+import seaborn as sns
+import zipfile
 
 class SEOScorer:
-    def __init__(self):
-        self.weights = {
-            'content_seo': 0.4,  # Adjusted weight after removing off-page SEO
-            'technical_seo': 0.4,
-            'user_experience': 0.2
-        }
+    # ... (previous methods remain the same) ...
 
-    def analyze_content_seo(self, df):
-        scores = {}
-        weaknesses = []
+    def process_multiple_files(self, files):
+        """Process multiple CSV files and return aggregated results"""
+        all_results = {}
+        combined_df = pd.DataFrame()
+        
+        for file in files:
+            try:
+                df = pd.read_csv(file)
+                filename = file.name
+                
+                # Calculate scores for this file
+                content_score, content_details = self.analyze_content_seo(df)
+                technical_score, technical_details = self.analyze_technical_seo(df)
+                ux_score, ux_details = self.analyze_user_experience(df)
+                overall_score = self.calculate_overall_score(content_score, technical_score, ux_score)
+                
+                # Store results
+                all_results[filename] = {
+                    'df': df,
+                    'scores': {
+                        'overall': overall_score,
+                        'content': {'score': content_score, 'details': content_details},
+                        'technical': {'score': technical_score, 'details': technical_details},
+                        'ux': {'score': ux_score, 'details': ux_details}
+                    }
+                }
+                
+                # Add to combined DataFrame
+                df['source_file'] = filename
+                combined_df = pd.concat([combined_df, df], ignore_index=True)
+                
+            except Exception as e:
+                st.error(f"Error processing {file.name}: {str(e)}")
+                
+        return all_results, combined_df
 
-        # Meta Title Analysis
-        if 'Title 1' in df.columns and 'Title 1 Length' in df.columns:
-            valid_titles = df['Title 1'].notna()
-            good_length = (df['Title 1 Length'] >= 30) & (df['Title 1 Length'] <= 60)
-            title_score = ((valid_titles & good_length).mean() * 100)
-            scores['meta_title'] = round(title_score)
-            if title_score < 50:
-                weaknesses.append("Short or missing meta titles.")
-        else:
-            scores['meta_title'] = 0
-
-        # Meta Description Analysis
-        if 'Meta Description 1' in df.columns and 'Meta Description 1 Length' in df.columns:
-            valid_desc = df['Meta Description 1'].notna()
-            good_length = (df['Meta Description 1 Length'] >= 120) & (df['Meta Description 1 Length'] <= 160)
-            desc_score = ((valid_desc & good_length).mean() * 100)
-            scores['meta_description'] = round(desc_score)
-            if desc_score < 50:
-                weaknesses.append("Short or missing meta descriptions.")
-        else:
-            scores['meta_description'] = 0
-
-        # H1 Tags
-        if 'H1-1' in df.columns:
-            h1_score = df['H1-1'].notna().mean() * 100
-            scores['h1_tags'] = round(h1_score)
-            if h1_score < 50:
-                weaknesses.append("Missing or poorly optimized H1 tags.")
-        else:
-            scores['h1_tags'] = 0
-
-        # Internal Linking
-        if 'Inlinks' in df.columns:
-            internal_linking_score = (df['Inlinks'] > 0).mean() * 100
-            scores['internal_linking'] = round(internal_linking_score)
-            if internal_linking_score < 50:
-                weaknesses.append("Insufficient internal linking.")
-        else:
-            scores['internal_linking'] = 0
-
-        return round(np.mean(list(scores.values()))), scores, weaknesses
-
-    def analyze_technical_seo(self, df):
-        scores = {}
-        weaknesses = []
-
-        # Response Time
-        if 'Response Time' in df.columns:
-            response_time_score = (df['Response Time'] <= 1.0).mean() * 100
-            scores['response_time'] = round(response_time_score)
-            if response_time_score < 50:
-                weaknesses.append("Slow response times.")
-        else:
-            scores['response_time'] = 0
-
-        # Indexability
-        if 'Indexability' in df.columns:
-            indexability_score = (df['Indexability'] == 'Indexable').mean() * 100
-            scores['indexability'] = round(indexability_score)
-            if indexability_score < 70:
-                weaknesses.append("Pages not indexable.")
-        else:
-            scores['indexability'] = 0
-
-        return round(np.mean(list(scores.values()))), scores, weaknesses
-
-    def analyze_user_experience(self, df):
-        scores = {}
-        weaknesses = []
-
-        # Mobile Friendly
-        if 'Mobile Alternate Link' in df.columns:
-            mobile_friendly_score = df['Mobile Alternate Link'].notna().mean() * 100
-            scores['mobile_friendly'] = round(mobile_friendly_score)
-            if mobile_friendly_score < 50:
-                weaknesses.append("Pages not mobile-friendly.")
-        else:
-            scores['mobile_friendly'] = 0
-
-        # Largest Contentful Paint (LCP)
-        if 'Largest Contentful Paint Time (ms)' in df.columns:
-            lcp_score = (df['Largest Contentful Paint Time (ms)'] <= 2500).mean() * 100
-            scores['largest_contentful_paint'] = round(lcp_score)
-            if lcp_score < 50:
-                weaknesses.append("Slow LCP times.")
-        else:
-            scores['largest_contentful_paint'] = 0
-
-        # Cumulative Layout Shift (CLS)
-        if 'Cumulative Layout Shift' in df.columns:
-            cls_score = (df['Cumulative Layout Shift'] <= 0.1).mean() * 100
-            scores['cumulative_layout_shift'] = round(cls_score)
-            if cls_score < 50:
-                weaknesses.append("High CLS values.")
-        else:
-            scores['cumulative_layout_shift'] = 0
-
-        return round(np.mean(list(scores.values()))), scores, weaknesses
-
-    def calculate_overall_score(self, content_score, technical_score, ux_score):
-        content_score = content_score / 100
-        technical_score = technical_score / 100
-        ux_score = ux_score / 100
-
-        weighted_scores = {
-            'Content SEO': content_score * self.weights['content_seo'],
-            'Technical SEO': technical_score * self.weights['technical_seo'],
-            'User Experience': ux_score * self.weights['user_experience']
-        }
-
-        return round(sum(weighted_scores.values()) * 100)
-
-    def summarize_category(self, weaknesses):
-        if weaknesses:
-            return "\n".join([f"- {issue}" for issue in weaknesses])
-        else:
-            return "No major issues detected."
+    def generate_bulk_excel_report(self, all_results):
+        """Generate comprehensive Excel report for multiple files"""
+        output = BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        bold = workbook.add_format({'bold': True})
+        
+        # Summary sheet
+        summary_sheet = workbook.add_worksheet('Summary')
+        summary_sheet.write('A1', 'Bulk SEO Analysis Summary', bold)
+        
+        # Headers
+        headers = ['Filename', 'Overall Score', 'Content Score', 'Technical Score', 'UX Score']
+        for col, header in enumerate(headers):
+            summary_sheet.write(0, col, header, bold)
+        
+        # Write data
+        row = 1
+        for filename, results in all_results.items():
+            scores = results['scores']
+            summary_sheet.write(row, 0, filename)
+            summary_sheet.write(row, 1, scores['overall'])
+            summary_sheet.write(row, 2, scores['content']['score'])
+            summary_sheet.write(row, 3, scores['technical']['score'])
+            summary_sheet.write(row, 4, scores['ux']['score'])
+            row += 1
+        
+        # Individual file sheets
+        for filename, results in all_results.items():
+            sheet_name = filename[:31]  # Excel sheet names limited to 31 chars
+            sheet = workbook.add_worksheet(sheet_name)
+            
+            # Write detailed scores
+            sheet.write('A1', f'Detailed Analysis - {filename}', bold)
+            current_row = 2
+            
+            for category, data in results['scores'].items():
+                if category != 'overall':
+                    sheet.write(current_row, 0, f"{category.title()} Score:", bold)
+                    sheet.write(current_row, 1, data['score'])
+                    current_row += 1
+                    
+                    for metric, score in data['details'].items():
+                        sheet.write(current_row, 0, f"  - {metric.replace('_', ' ').title()}")
+                        sheet.write(current_row, 1, score)
+                        current_row += 1
+                    current_row += 1
+        
+        workbook.close()
+        return output.getvalue()
 
 def main():
-    st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
-    st.title("SEO Readiness Score Calculator")
-    st.write("Upload your Screaming Frog exports to analyze SEO readiness")
-
-    uploaded_file = st.file_uploader("Upload Internal HTML Report (CSV or XLSX)", type=['csv', 'xlsx'])
-
-    if uploaded_file:
+    st.set_page_config(page_title="Bulk SEO Readiness Scorer", layout="wide")
+    
+    st.title("Bulk SEO Readiness Score Calculator")
+    
+    # Sidebar configuration
+    st.sidebar.header("Configuration")
+    score_threshold = st.sidebar.slider("Score Warning Threshold", 0, 100, 70)
+    show_recommendations = st.sidebar.checkbox("Show Recommendations", True)
+    show_charts = st.sidebar.checkbox("Show Visualization", True)
+    
+    # File upload - now accepts multiple files
+    uploaded_files = st.file_uploader("Upload Internal HTML Reports (CSV)", 
+                                    type=['csv'], 
+                                    accept_multiple_files=True)
+    
+    if uploaded_files:
         try:
-            df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
             scorer = SEOScorer()
-
-            # Analyze scores
-            content_score, content_details, content_weaknesses = scorer.analyze_content_seo(df)
-            technical_score, technical_details, technical_weaknesses = scorer.analyze_technical_seo(df)
-            ux_score, ux_details, ux_weaknesses = scorer.analyze_user_experience(df)
-            overall_score = scorer.calculate_overall_score(content_score, technical_score, ux_score)
-
-            # Display results
-            st.header("SEO Readiness Scores")
-
-            col1, col2, col3 = st.columns(3)
+            all_results, combined_df = scorer.process_multiple_files(uploaded_files)
+            
+            # Display results in tabs
+            tab1, tab2, tab3 = st.tabs(["Overview", "Individual Analysis", "Comparative Analysis"])
+            
+            with tab1:
+                st.header("Bulk Analysis Overview")
+                
+                # Summary metrics
+                overall_scores = [results['scores']['overall'] 
+                                for results in all_results.values()]
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Average Overall Score", 
+                             f"{np.mean(overall_scores):.1f}")
+                with col2:
+                    st.metric("Best Score", 
+                             f"{max(overall_scores):.1f}")
+                with col3:
+                    st.metric("Worst Score", 
+                             f"{min(overall_scores):.1f}")
+                
+                # Summary chart
+                if show_charts:
+                    fig = px.bar(
+                        x=list(all_results.keys()),
+                        y=overall_scores,
+                        title="Overall Scores by File",
+                        labels={'x': 'File', 'y': 'Score'},
+                        color=overall_scores,
+                        color_continuous_scale=['red', 'yellow', 'green']
+                    )
+                    fig.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig)
+            
+            with tab2:
+                st.header("Individual File Analysis")
+                
+                # File selector
+                selected_file = st.selectbox(
+                    "Select File to Analyze",
+                    list(all_results.keys())
+                )
+                
+                if selected_file:
+                    results = all_results[selected_file]
+                    scores = results['scores']
+                    
+                    # Display individual file analysis
+                    st.subheader(f"Analysis for {selected_file}")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Content SEO Score", 
+                                 f"{scores['content']['score']:.1f}/100")
+                        for metric, score in scores['content']['details'].items():
+                            color = 'red' if score < score_threshold else 'green'
+                            st.markdown(f"**{metric.replace('_', ' ').title()}:** "
+                                      f"<span style='color:{color}'>{score:.1f}/100</span>", 
+                                      unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.metric("Technical SEO Score", 
+                                 f"{scores['technical']['score']:.1f}/100")
+                        for metric, score in scores['technical']['details'].items():
+                            color = 'red' if score < score_threshold else 'green'
+                            st.markdown(f"**{metric.replace('_', ' ').title()}:** "
+                                      f"<span style='color:{color}'>{score:.1f}/100</span>", 
+                                      unsafe_allow_html=True)
+                    
+                    with col3:
+                        st.metric("User Experience Score", 
+                                 f"{scores['ux']['score']:.1f}/100")
+                        for metric, score in scores['ux']['details'].items():
+                            color = 'red' if score < score_threshold else 'green'
+                            st.markdown(f"**{metric.replace('_', ' ').title()}:** "
+                                      f"<span style='color:{color}'>{score:.1f}/100</span>", 
+                                      unsafe_allow_html=True)
+            
+            with tab3:
+                st.header("Comparative Analysis")
+                
+                if show_charts:
+                    # Prepare data for comparison
+                    comparison_data = {
+                        'File': [],
+                        'Category': [],
+                        'Score': []
+                    }
+                    
+                    for filename, results in all_results.items():
+                        scores = results['scores']
+                        comparison_data['File'].extend([filename] * 3)
+                        comparison_data['Category'].extend(['Content', 'Technical', 'UX'])
+                        comparison_data['Score'].extend([
+                            scores['content']['score'],
+                            scores['technical']['score'],
+                            scores['ux']['score']
+                        ])
+                    
+                    comparison_df = pd.DataFrame(comparison_data)
+                    
+                    # Create comparison chart
+                    fig = px.bar(
+                        comparison_df,
+                        x='File',
+                        y='Score',
+                        color='Category',
+                        barmode='group',
+                        title="Score Comparison Across Files"
+                    )
+                    fig.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig)
+            
+            # Export options
+            st.header("Export Options")
+            col1, col2 = st.columns(2)
+            
             with col1:
-                st.metric("Content SEO Score", f"{content_score}/100")
-                st.subheader("Content SEO Summary")
-                st.text(scorer.summarize_category(content_weaknesses))
-
+                if st.button("Generate Bulk Excel Report"):
+                    excel_data = scorer.generate_bulk_excel_report(all_results)
+                    st.download_button(
+                        label="Download Excel Report",
+                        data=excel_data,
+                        file_name=f"bulk_seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+            
             with col2:
-                st.metric("Technical SEO Score", f"{technical_score}/100")
-                st.subheader("Technical SEO Summary")
-                st.text(scorer.summarize_category(technical_weaknesses))
-
-            with col3:
-                st.metric("User Experience Score", f"{ux_score}/100")
-                st.subheader("User Experience Summary")
-                st.text(scorer.summarize_category(ux_weaknesses))
-
-            st.header("Overall SEO Readiness Score")
-            st.metric("Final Score", f"{overall_score}/100")
-
+                if st.button("Generate JSON Report"):
+                    json_data = {
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "summary": {
+                            "average_score": float(np.mean(overall_scores)),
+                            "best_score": float(max(overall_scores)),
+                            "worst_score": float(min(overall_scores))
+                        },
+                        "individual_results": {
+                            filename: {
+                                "overall_score": float(results['scores']['overall']),
+                                "content_score": float(results['scores']['content']['score']),
+                                "technical_score": float(results['scores']['technical']['score']),
+                                "ux_score": float(results['scores']['ux']['score']),
+                                "detailed_scores": {
+                                    category: {
+                                        "score": float(data['score']),
+                                        "details": {k: float(v) for k, v in data['details'].items()}
+                                    } for category, data in results['scores'].items() 
+                                    if category != 'overall'
+                                }
+                            } for filename, results in all_results.items()
+                        }
+                    }
+                    
+                    json_str = json.dumps(json_data, indent=2)
+                    st.download_button(
+                        label="Download JSON Report",
+                        data=json_str,
+                        file_name=f"bulk_seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                        mime="application/json"
+                    )
+                    
         except Exception as e:
-            st.error(f"Error processing file: {str(e)}")
+            st.error(f"Error processing files: {str(e)}")
+            st.write("Please make sure you're uploading the correct Screaming Frog export files.")
 
 if __name__ == "__main__":
     main()
