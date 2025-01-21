@@ -56,7 +56,6 @@ class SEOScorer:
         scores['content_quality'] = round(content_quality_score)
 
         return round(np.mean(list(scores.values()))), scores
-
     def analyze_technical_seo(self, df):
         scores = {}
 
@@ -99,23 +98,32 @@ class SEOScorer:
             mobile_score = df['Mobile Alternate Link'].notna().mean() * 100
         scores['mobile_friendly'] = round(mobile_score)
 
-        # Page Speed (based on response time as proxy)
-        speed_score = 0
-        if 'Response Time' in df.columns:
-            fast_pages = df['Response Time'] <= 0.5  # 500ms threshold
-            speed_score = fast_pages.mean() * 100
-        scores['page_speed'] = round(speed_score)
+        # Page Speed Metrics from Screaming Frog
+        lcp_score = 0
+        if 'LCP' in df.columns:
+            good_lcp = df['LCP'] <= 2.5
+            lcp_score = good_lcp.mean() * 100
+        scores['largest_contentful_paint'] = round(lcp_score)
+
+        fid_score = 0
+        if 'FID' in df.columns:
+            good_fid = df['FID'] <= 100
+            fid_score = good_fid.mean() * 100
+        scores['first_input_delay'] = round(fid_score)
+
+        cls_score = 0
+        if 'CLS' in df.columns:
+            good_cls = df['CLS'] <= 0.1
+            cls_score = good_cls.mean() * 100
+        scores['cumulative_layout_shift'] = round(cls_score)
+
+        # Overall PageSpeed Score
+        pagespeed_score = 0
+        if 'PageSpeed Score' in df.columns:
+            pagespeed_score = df['PageSpeed Score'].mean()
+        scores['pagespeed_score'] = round(pagespeed_score)
 
         return round(np.mean(list(scores.values()))), scores
-
-    def calculate_tiered_score(self, score):
-        if score >= 90:
-            return 1  # Full weight
-        elif score >= 50:
-            return 0.5  # Half weight
-        else:
-            return 0  # Zero weight
-
     def calculate_overall_score(self, content_score, technical_score, ux_score):
         # Normalize input scores to 0-1 scale
         content_score = content_score / 100
@@ -134,12 +142,15 @@ class SEOScorer:
         # Categorize score into Good, Medium, or Bad
         if overall_score >= 90:
             category = "Good"
+            color = "green"
         elif overall_score >= 50:
             category = "Medium"
+            color = "orange"
         else:
             category = "Bad"
+            color = "red"
 
-        return round(overall_score), category
+        return round(overall_score), category, color
 
 def main():
     st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
@@ -151,27 +162,20 @@ def main():
 
     if uploaded_file:
         try:
-            # Check file type and read accordingly
             if uploaded_file.name.endswith('.csv'):
                 df = pd.read_csv(uploaded_file)
             elif uploaded_file.name.endswith('.xlsx'):
                 df = pd.read_excel(uploaded_file)
 
-            # Initialize scorer
             scorer = SEOScorer()
-
-            # Calculate scores
             content_score, content_details = scorer.analyze_content_seo(df)
             technical_score, technical_details = scorer.analyze_technical_seo(df)
             ux_score, ux_details = scorer.analyze_user_experience(df)
+            overall_score, category, color = scorer.calculate_overall_score(content_score, technical_score, ux_score)
 
-            overall_score, category = scorer.calculate_overall_score(content_score, technical_score, ux_score)
-
-            # Display results
             st.header("SEO Readiness Scores")
 
             col1, col2, col3 = st.columns(3)
-
             with col1:
                 st.metric("Content SEO Score", f"{content_score}/100")
                 st.subheader("Content Details")
@@ -192,66 +196,10 @@ def main():
 
             st.header("Overall SEO Readiness Score")
             st.metric("Final Score", f"{overall_score}/100")
-            st.write(f"Category: {category}")
-
-            # Export functionality
-            if st.button("Generate Report"):
-                report_data = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "overall_score": int(overall_score),
-                    "category": category,
-                    "scores": {
-                        "content_seo": {
-                            "total": int(content_score),
-                            "details": {k: int(v) for k, v in content_details.items()}
-                        },
-                        "technical_seo": {
-                            "total": int(technical_score),
-                            "details": {k: int(v) for k, v in technical_details.items()}
-                        },
-                        "user_experience": {
-                            "total": int(ux_score),
-                            "details": {k: int(v) for k, v in ux_details.items()}
-                        }
-                    }
-                }
-
-                # JSON export
-                json_str = json.dumps(report_data, indent=2)
-                st.download_button(
-                    label="Download Report (JSON)",
-                    data=json_str,
-                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                    mime="application/json"
-                )
-
-                # Excel export
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    summary_df = pd.DataFrame({
-                        'Metric': ['Content SEO', 'Technical SEO', 'User Experience', 'Overall Score'],
-                        'Score': [content_score, technical_score, ux_score, overall_score],
-                        'Category': [None, None, None, category]
-                    })
-                    summary_df.to_excel(writer, index=False, sheet_name='Summary')
-
-                    details_df = pd.DataFrame.from_dict({
-                        'Content SEO': content_details,
-                        'Technical SEO': technical_details,
-                        'User Experience': ux_details
-                    }, orient='index').transpose()
-                    details_df.to_excel(writer, index=False, sheet_name='Details')
-
-                st.download_button(
-                    label="Download Report (XLSX)",
-                    data=output.getvalue(),
-                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.markdown(f"<h3 style='color:{color}; font-size:24px;'>Category: {category}</h3>", unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            st.write("Please make sure you're uploading the correct Screaming Frog export file.")
 
 if __name__ == "__main__":
     main()
