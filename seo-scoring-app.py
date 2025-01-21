@@ -18,105 +18,76 @@ class SEOScorer:
         scores = {}
 
         # Meta Title Analysis
-        title_score = 0
         if 'Title 1' in df.columns and 'Title 1 Length' in df.columns:
             valid_titles = df['Title 1'].notna()
             good_length = (df['Title 1 Length'] >= 30) & (df['Title 1 Length'] <= 60)
-            title_score = ((valid_titles & good_length).mean() * 100)
-        scores['meta_title'] = round(title_score)
+            scores['meta_title'] = round((valid_titles & good_length).mean() * 100)
+        else:
+            scores['meta_title'] = 0
 
         # Meta Description Analysis
-        desc_score = 0
         if 'Meta Description 1' in df.columns and 'Meta Description 1 Length' in df.columns:
             valid_desc = df['Meta Description 1'].notna()
             good_length = (df['Meta Description 1 Length'] >= 120) & (df['Meta Description 1 Length'] <= 160)
-            desc_score = ((valid_desc & good_length).mean() * 100)
-        scores['meta_description'] = round(desc_score)
+            scores['meta_description'] = round((valid_desc & good_length).mean() * 100)
+        else:
+            scores['meta_description'] = 0
 
-        # Heading Structure
-        h1_score = 0
+        # H1 Tags
         if 'H1-1' in df.columns:
-            h1_score = df['H1-1'].notna().mean() * 100
-        scores['h1_tags'] = round(h1_score)
+            scores['h1_tags'] = round(df['H1-1'].notna().mean() * 100)
+        else:
+            scores['h1_tags'] = 0
 
         # Internal Linking
-        internal_linking_score = 0
-        if 'Inlinks' in df.columns and 'Unique Inlinks' in df.columns:
-            has_inlinks = df['Inlinks'] > 0
-            has_unique_inlinks = df['Unique Inlinks'] > 0
-            internal_linking_score = ((has_inlinks & has_unique_inlinks).mean() * 100)
-        scores['internal_linking'] = round(internal_linking_score)
-
-        # Content Quality
-        content_quality_score = 0
-        if 'Word Count' in df.columns and 'Flesch Reading Ease Score' in df.columns:
-            good_length = df['Word Count'] >= 300
-            readable = df['Flesch Reading Ease Score'] >= 60
-            content_quality_score = ((good_length & readable).mean() * 100)
-        scores['content_quality'] = round(content_quality_score)
+        if 'Inlinks' in df.columns:
+            scores['internal_linking'] = round((df['Inlinks'] > 0).mean() * 100)
+        else:
+            scores['internal_linking'] = 0
 
         return round(np.mean(list(scores.values()))), scores
 
     def analyze_technical_seo(self, df):
         scores = {}
 
-        # Response Time Analysis
-        response_score = 0
-        if 'Response Time' in df.columns:
-            good_response = df['Response Time'] <= 1.0  # 1 second threshold
-            response_score = good_response.mean() * 100
-        scores['response_time'] = round(response_score)
-
-        # Status Code Analysis
-        status_score = 0
-        if 'Status Code' in df.columns:
-            good_status = df['Status Code'] == 200
-            status_score = good_status.mean() * 100
-        scores['status_codes'] = round(status_score)
-
         # Indexability
-        index_score = 0
         if 'Indexability' in df.columns:
-            indexable = df['Indexability'] == 'Indexable'
-            index_score = indexable.mean() * 100
-        scores['indexability'] = round(index_score)
+            scores['indexability'] = round((df['Indexability'] == 'Indexable').mean() * 100)
+        else:
+            scores['indexability'] = 0
 
-        # Canonical Implementation
-        canonical_score = 0
-        if 'Canonical Link Element 1' in df.columns:
-            valid_canonical = df['Canonical Link Element 1'].notna()
-            canonical_score = valid_canonical.mean() * 100
-        scores['canonical_tags'] = round(canonical_score)
+        # Response Time
+        if 'Response Time' in df.columns:
+            scores['response_time'] = round((df['Response Time'] <= 1.0).mean() * 100)
+        else:
+            scores['response_time'] = 0
 
         return round(np.mean(list(scores.values()))), scores
 
     def analyze_user_experience(self, df):
         scores = {}
 
-        # Mobile Friendliness
-        mobile_score = 0
+        # Mobile Friendly
         if 'Mobile Alternate Link' in df.columns:
-            mobile_score = df['Mobile Alternate Link'].notna().mean() * 100
-        scores['mobile_friendly'] = round(mobile_score)
+            scores['mobile_friendly'] = round(df['Mobile Alternate Link'].notna().mean() * 100)
+        else:
+            scores['mobile_friendly'] = 0
 
-        # Page Speed (based on response time as proxy)
-        speed_score = 0
-        if 'Response Time' in df.columns:
-            fast_pages = df['Response Time'] <= 0.5  # 500ms threshold
-            speed_score = fast_pages.mean() * 100
-        scores['page_speed'] = round(speed_score)
+        # Largest Contentful Paint (LCP)
+        if 'Largest Contentful Paint Time (ms)' in df.columns:
+            scores['largest_contentful_paint'] = round((df['Largest Contentful Paint Time (ms)'] <= 2500).mean() * 100)
+        else:
+            scores['largest_contentful_paint'] = 0
 
-        # Content Readability
-        readability_score = 0
-        if 'Flesch Reading Ease Score' in df.columns:
-            good_readability = df['Flesch Reading Ease Score'] >= 60
-            readability_score = good_readability.mean() * 100
-        scores['readability'] = round(readability_score)
+        # Cumulative Layout Shift (CLS)
+        if 'Cumulative Layout Shift' in df.columns:
+            scores['cumulative_layout_shift'] = round((df['Cumulative Layout Shift'] <= 0.1).mean() * 100)
+        else:
+            scores['cumulative_layout_shift'] = 0
 
         return round(np.mean(list(scores.values()))), scores
 
     def calculate_overall_score(self, content_score, technical_score, ux_score):
-        # Normalize the input scores to 0-1 scale since they come in as 0-100
         content_score = content_score / 100
         technical_score = technical_score / 100
         ux_score = ux_score / 100
@@ -127,12 +98,10 @@ class SEOScorer:
             'User Experience': ux_score * self.weights['user_experience']
         }
 
-        # Calculate final score on 0-100 scale
-        return round(sum(weighted_scores.values()) / (sum(self.weights.values()) - self.weights['off_page_seo']) * 100)
+        return round(sum(weighted_scores.values()) / sum(self.weights.values()) * 100)
 
 def main():
     st.set_page_config(page_title="SEO Readiness Scorer", layout="wide")
-
     st.title("SEO Readiness Score Calculator")
     st.write("Upload your Screaming Frog exports to analyze SEO readiness")
 
@@ -140,11 +109,8 @@ def main():
 
     if uploaded_file:
         try:
-            # Check file type and read accordingly
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith('.xlsx'):
-                df = pd.read_excel(uploaded_file)
+            # Load file
+            df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
 
             # Initialize scorer
             scorer = SEOScorer()
@@ -182,62 +148,8 @@ def main():
             st.header("Overall SEO Readiness Score")
             st.metric("Final Score", f"{overall_score}/100")
 
-            # Export functionality
-            if st.button("Generate Report"):
-                report_data = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "overall_score": int(overall_score),
-                    "scores": {
-                        "content_seo": {
-                            "total": int(content_score),
-                            "details": {k: int(v) for k, v in content_details.items()}
-                        },
-                        "technical_seo": {
-                            "total": int(technical_score),
-                            "details": {k: int(v) for k, v in technical_details.items()}
-                        },
-                        "user_experience": {
-                            "total": int(ux_score),
-                            "details": {k: int(v) for k, v in ux_details.items()}
-                        }
-                    }
-                }
-
-                # JSON export
-                json_str = json.dumps(report_data, indent=2)
-                st.download_button(
-                    label="Download Report (JSON)",
-                    data=json_str,
-                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                    mime="application/json"
-                )
-
-                # Excel export
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    summary_df = pd.DataFrame({
-                        'Metric': ['Content SEO', 'Technical SEO', 'User Experience', 'Overall Score'],
-                        'Score': [content_score, technical_score, ux_score, overall_score]
-                    })
-                    summary_df.to_excel(writer, index=False, sheet_name='Summary')
-
-                    details_df = pd.DataFrame.from_dict({
-                        'Content SEO': content_details,
-                        'Technical SEO': technical_details,
-                        'User Experience': ux_details
-                    }, orient='index').transpose()
-                    details_df.to_excel(writer, index=False, sheet_name='Details')
-
-                st.download_button(
-                    label="Download Report (XLSX)",
-                    data=output.getvalue(),
-                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
-            st.write("Please make sure you're uploading the correct Screaming Frog export file.")
 
 if __name__ == "__main__":
     main()
