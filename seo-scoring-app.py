@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 class SEOScorer:
     def __init__(self):
@@ -162,28 +160,29 @@ class SEOScorer:
             return "F"
 
 def create_score_gauge(score, title):
-    """Create a visual score representation using Streamlit components"""
-    # Calculate percentage for progress bar
-    progress_value = score / 100
-    
+    """Create a visual score representation using HTML/CSS"""
     # Color based on score
     if score >= 80:
         color = "#28a745"  # Green
+        bg_color = "#d4edda"
     elif score >= 60:
         color = "#ffc107"  # Yellow
+        bg_color = "#fff3cd"
     elif score >= 40:
         color = "#fd7e14"  # Orange
+        bg_color = "#ffeaa7"
     else:
         color = "#dc3545"  # Red
+        bg_color = "#f8d7da"
     
     # Create a visual gauge using HTML/CSS
     gauge_html = f"""
-    <div style="text-align: center; padding: 20px;">
-        <h4 style="margin-bottom: 10px; color: #333;">{title}</h4>
-        <div style="position: relative; width: 200px; height: 200px; margin: 0 auto;">
+    <div style="text-align: center; padding: 20px; background: {bg_color}; border-radius: 15px; margin: 10px 0;">
+        <h4 style="margin-bottom: 15px; color: #333; font-size: 1.2rem;">{title}</h4>
+        <div style="position: relative; width: 120px; height: 120px; margin: 0 auto;">
             <div style="
-                width: 200px; 
-                height: 200px; 
+                width: 120px; 
+                height: 120px; 
                 border-radius: 50%; 
                 background: conic-gradient({color} {score * 3.6}deg, #e9ecef {score * 3.6}deg);
                 display: flex;
@@ -192,53 +191,64 @@ def create_score_gauge(score, title):
                 position: relative;
             ">
                 <div style="
-                    width: 160px; 
-                    height: 160px; 
+                    width: 90px; 
+                    height: 90px; 
                     background: white; 
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     flex-direction: column;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
                 ">
-                    <span style="font-size: 2rem; font-weight: bold; color: {color};">{score}</span>
-                    <span style="font-size: 0.9rem; color: #666;">out of 100</span>
+                    <span style="font-size: 1.5rem; font-weight: bold; color: {color};">{score}</span>
+                    <span style="font-size: 0.7rem; color: #666;">/ 100</span>
                 </div>
             </div>
+        </div>
+        <div style="margin-top: 10px; font-weight: 600; color: {color};">
+            {get_score_status(score)}
         </div>
     </div>
     """
     return gauge_html
 
-def create_category_breakdown(content_details, technical_details, ux_details):
-    """Create a detailed breakdown using Streamlit's built-in charts"""
-    categories = []
-    scores = []
-    category_types = []
+def get_score_status(score):
+    """Get status text based on score"""
+    if score >= 90:
+        return "🏆 Excellent"
+    elif score >= 80:
+        return "✅ Very Good"
+    elif score >= 70:
+        return "👍 Good"
+    elif score >= 60:
+        return "⚠️ Average"
+    elif score >= 50:
+        return "🔶 Below Average"
+    else:
+        return "❌ Needs Work"
+
+def create_progress_bar(score, label):
+    """Create a styled progress bar"""
+    color = "#28a745" if score >= 80 else "#ffc107" if score >= 60 else "#fd7e14" if score >= 40 else "#dc3545"
     
-    for metric, score in content_details.items():
-        categories.append(metric.replace('_', ' ').title())
-        scores.append(score)
-        category_types.append('Content SEO')
-    
-    for metric, score in technical_details.items():
-        categories.append(metric.replace('_', ' ').title())
-        scores.append(score)
-        category_types.append('Technical SEO')
-    
-    for metric, score in ux_details.items():
-        categories.append(metric.replace('_', ' ').title())
-        scores.append(score)
-        category_types.append('User Experience')
-    
-    # Create DataFrame for the chart
-    chart_data = pd.DataFrame({
-        'Metric': categories,
-        'Score': scores,
-        'Category': category_types
-    })
-    
-    return chart_data
+    return f"""
+    <div style="margin: 10px 0;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span style="font-weight: 600; color: #333;">{label}</span>
+            <span style="font-weight: 600; color: {color};">{score}/100</span>
+        </div>
+        <div style="background-color: #e9ecef; border-radius: 10px; height: 20px; overflow: hidden;">
+            <div style="
+                background-color: {color}; 
+                height: 100%; 
+                width: {score}%; 
+                border-radius: 10px;
+                transition: width 0.5s ease-in-out;
+            "></div>
+        </div>
+    </div>
+    """
 
 def main():
     st.set_page_config(
@@ -257,6 +267,7 @@ def main():
         font-size: 3rem;
         font-weight: 700;
         margin-bottom: 1rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
     .subtitle {
         text-align: center;
@@ -266,49 +277,58 @@ def main():
     }
     .score-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 15px;
+        padding: 2.5rem;
+        border-radius: 20px;
         text-align: center;
         color: white;
         margin: 1rem 0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
     .score-value {
-        font-size: 3rem;
+        font-size: 4rem;
         font-weight: bold;
         margin: 0.5rem 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
     .grade {
         font-size: 2rem;
         font-weight: bold;
         margin: 0.5rem 0;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
     }
     .metric-container {
         background: white;
         padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         margin: 1rem 0;
-        border-left: 4px solid #1f77b4;
+        border-left: 5px solid #1f77b4;
     }
     .weakness-box {
-        background: #f8f9fa;
+        background: #fff5f5;
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 10px;
         border-left: 4px solid #dc3545;
         margin: 0.5rem 0;
+        box-shadow: 0 2px 5px rgba(220,53,69,0.1);
     }
     .success-box {
-        background: #d4edda;
+        background: #f0f9f0;
         padding: 1rem;
-        border-radius: 8px;
+        border-radius: 10px;
         border-left: 4px solid #28a745;
         margin: 0.5rem 0;
+        box-shadow: 0 2px 5px rgba(40,167,69,0.1);
     }
     .upload-section {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         padding: 2rem;
-        border-radius: 15px;
+        border-radius: 20px;
         margin: 2rem 0;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .stProgress > div > div > div > div {
+        background-image: linear-gradient(to right, #667eea, #764ba2);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -339,12 +359,20 @@ def main():
         
         st.header("📋 Score Guide")
         st.write("""
-        - **90-100**: A+ (Excellent)
-        - **80-89**: A (Very Good)
-        - **70-79**: B (Good)
-        - **60-69**: C (Average)
-        - **50-59**: D (Below Average)
-        - **0-49**: F (Poor)
+        - **90-100**: A+ (Excellent) 🏆
+        - **80-89**: A (Very Good) ✅
+        - **70-79**: B (Good) 👍
+        - **60-69**: C (Average) ⚠️
+        - **50-59**: D (Below Average) 🔶
+        - **0-49**: F (Poor) ❌
+        """)
+
+        st.header("🎨 Features")
+        st.write("""
+        - **Visual Gauges**: Circular progress indicators
+        - **Color Coding**: Red, orange, yellow, green scoring
+        - **Detailed Breakdown**: Individual metric analysis
+        - **Actionable Insights**: Specific improvement suggestions
         """)
 
     # File upload section
@@ -379,132 +407,256 @@ def main():
                 grade = scorer.get_grade(overall_score)
                 st.markdown(f"""
                 <div class="score-card">
-                    <h2>Overall SEO Readiness Score</h2>
+                    <h2>🎯 Overall SEO Readiness Score</h2>
                     <div class="score-value">{overall_score}/100</div>
                     <div class="grade">Grade: {grade}</div>
+                    <p style="margin-top: 1rem; font-size: 1.1rem;">
+                        {get_score_status(overall_score)}
+                    </p>
                 </div>
                 """, unsafe_allow_html=True)
 
             st.markdown("---")
 
             # Individual score gauges
-            st.header("📈 Detailed Scores")
+            st.header("📈 Category Breakdown")
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                gauge_html1 = create_score_gauge(content_score, "Content SEO")
+                gauge_html1 = create_score_gauge(content_score, "🎯 Content SEO")
                 st.markdown(gauge_html1, unsafe_allow_html=True)
                 
             with col2:
-                gauge_html2 = create_score_gauge(technical_score, "Technical SEO")
+                gauge_html2 = create_score_gauge(technical_score, "⚙️ Technical SEO")
                 st.markdown(gauge_html2, unsafe_allow_html=True)
                 
             with col3:
-                gauge_html3 = create_score_gauge(ux_score, "User Experience")
+                gauge_html3 = create_score_gauge(ux_score, "👥 User Experience")
                 st.markdown(gauge_html3, unsafe_allow_html=True)
 
-            # Detailed breakdown chart
-            st.header("🔍 Metric Breakdown")
-            chart_data = create_category_breakdown(content_details, technical_details, ux_details)
-            st.bar_chart(chart_data.set_index('Metric')['Score'])
+            # Progress bars for all metrics
+            st.header("🔍 Detailed Metrics")
             
-            # Show the data in a more detailed way
-            st.subheader("📊 Detailed Metrics Table")
+            col1, col2 = st.columns(2)
             
-            # Color code the scores in the dataframe display
-            def color_scores(val):
-                if val >= 80:
-                    color = '#d4edda'  # Light green
-                elif val >= 60:
-                    color = '#fff3cd'  # Light yellow
-                elif val >= 40:
-                    color = '#f8d7da'  # Light red
-                else:
-                    color = '#f5c6cb'  # Darker red
-                return f'background-color: {color}'
+            with col1:
+                st.subheader("📝 Content SEO Metrics")
+                for metric, score in content_details.items():
+                    label = metric.replace('_', ' ').title()
+                    st.markdown(create_progress_bar(score, label), unsafe_allow_html=True)
+                
+                st.subheader("⚙️ Technical SEO Metrics")
+                for metric, score in technical_details.items():
+                    label = metric.replace('_', ' ').title()
+                    st.markdown(create_progress_bar(score, label), unsafe_allow_html=True)
             
-            styled_df = chart_data.style.applymap(color_scores, subset=['Score'])
-            st.dataframe(styled_df, use_container_width=True)
+            with col2:
+                st.subheader("👥 User Experience Metrics")
+                for metric, score in ux_details.items():
+                    label = metric.replace('_', ' ').title()
+                    st.markdown(create_progress_bar(score, label), unsafe_allow_html=True)
+                
+                # Create summary chart data
+                st.subheader("📊 Score Summary")
+                summary_data = pd.DataFrame({
+                    'Category': ['Content SEO', 'Technical SEO', 'User Experience'],
+                    'Score': [content_score, technical_score, ux_score]
+                })
+                st.bar_chart(summary_data.set_index('Category')['Score'])
 
             # Category summaries with improved styling
-            st.header("📋 Detailed Analysis")
+            st.markdown("---")
+            st.header("📋 Issue Analysis & Recommendations")
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
                 st.markdown(f"""
                 <div class="metric-container">
-                    <h3>🎯 Content SEO Score: {content_score}/100</h3>
-                    <h4>Issues Found:</h4>
+                    <h3>🎯 Content SEO Analysis</h3>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: {scorer.get_score_color(content_score)}; text-align: center; margin: 1rem 0;">
+                        {content_score}/100
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 if content_weaknesses:
+                    st.markdown("**Issues Found:**")
                     for weakness in content_weaknesses:
                         st.markdown(f'<div class="weakness-box">⚠️ {weakness}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown('<div class="success-box">✅ No major issues detected.</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="success-box">✅ No major issues detected in content SEO!</div>', unsafe_allow_html=True)
 
             with col2:
                 st.markdown(f"""
                 <div class="metric-container">
-                    <h3>⚙️ Technical SEO Score: {technical_score}/100</h3>
-                    <h4>Issues Found:</h4>
+                    <h3>⚙️ Technical SEO Analysis</h3>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: {scorer.get_score_color(technical_score)}; text-align: center; margin: 1rem 0;">
+                        {technical_score}/100
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 if technical_weaknesses:
+                    st.markdown("**Issues Found:**")
                     for weakness in technical_weaknesses:
                         st.markdown(f'<div class="weakness-box">⚠️ {weakness}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown('<div class="success-box">✅ No major issues detected.</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="success-box">✅ No major issues detected in technical SEO!</div>', unsafe_allow_html=True)
 
             with col3:
                 st.markdown(f"""
                 <div class="metric-container">
-                    <h3>👥 User Experience Score: {ux_score}/100</h3>
-                    <h4>Issues Found:</h4>
+                    <h3>👥 User Experience Analysis</h3>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: {scorer.get_score_color(ux_score)}; text-align: center; margin: 1rem 0;">
+                        {ux_score}/100
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 if ux_weaknesses:
+                    st.markdown("**Issues Found:**")
                     for weakness in ux_weaknesses:
                         st.markdown(f'<div class="weakness-box">⚠️ {weakness}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown('<div class="success-box">✅ No major issues detected.</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="success-box">✅ No major issues detected in user experience!</div>', unsafe_allow_html=True)
 
-            # Data summary
+            # Data summary with enhanced metrics
             st.markdown("---")
-            st.header("📊 Data Summary")
+            st.header("📊 Analysis Summary")
+            
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric("Total Pages Analyzed", len(df))
+                st.metric(
+                    "Total Pages Analyzed", 
+                    f"{len(df):,}",
+                    help="Total number of pages in your crawl data"
+                )
+            
             with col2:
-                st.metric("Analysis Date", datetime.now().strftime("%Y-%m-%d"))
+                st.metric(
+                    "Analysis Date", 
+                    datetime.now().strftime("%Y-%m-%d"),
+                    help="Date when this analysis was performed"
+                )
+            
             with col3:
-                indexable_pages = df[df['Indexability'] == 'Indexable'].shape[0] if 'Indexability' in df.columns else 0
-                st.metric("Indexable Pages", indexable_pages)
+                if 'Indexability' in df.columns:
+                    indexable_pages = df[df['Indexability'] == 'Indexable'].shape[0]
+                    indexable_percentage = round((indexable_pages / len(df)) * 100, 1)
+                    st.metric(
+                        "Indexable Pages", 
+                        f"{indexable_pages:,}",
+                        delta=f"{indexable_percentage}%",
+                        help="Number and percentage of indexable pages"
+                    )
+                else:
+                    st.metric("Indexable Pages", "N/A")
+            
             with col4:
-                avg_response_time = round(df['Response Time'].mean(), 2) if 'Response Time' in df.columns else 0
-                st.metric("Avg Response Time (s)", avg_response_time)
+                if 'Response Time' in df.columns:
+                    avg_response_time = round(df['Response Time'].mean(), 2)
+                    st.metric(
+                        "Avg Response Time", 
+                        f"{avg_response_time}s",
+                        delta="Target: < 1.0s" if avg_response_time <= 1.0 else "Target: < 1.0s",
+                        delta_color="normal" if avg_response_time <= 1.0 else "inverse",
+                        help="Average page response time across all pages"
+                    )
+                else:
+                    st.metric("Avg Response Time", "N/A")
+
+            # Additional insights
+            st.markdown("---")
+            st.header("💡 Key Insights")
+            
+            insights = []
+            if overall_score >= 80:
+                insights.append("🎉 **Excellent work!** Your site has strong SEO fundamentals.")
+            elif overall_score >= 60:
+                insights.append("👍 **Good foundation** with room for targeted improvements.")
+            else:
+                insights.append("⚠️ **Significant improvements needed** to boost SEO performance.")
+            
+            # Priority recommendations based on lowest scores
+            categories = [
+                ("Content SEO", content_score, "Focus on meta titles, descriptions, and H1 optimization"),
+                ("Technical SEO", technical_score, "Improve page speed and ensure all pages are indexable"),
+                ("User Experience", ux_score, "Optimize Core Web Vitals and mobile experience")
+            ]
+            
+            lowest_category = min(categories, key=lambda x: x[1])
+            insights.append(f"🎯 **Priority area**: {lowest_category[0]} (Score: {lowest_category[1]}) - {lowest_category[2]}")
+            
+            for insight in insights:
+                st.markdown(insight)
 
         except Exception as e:
             st.error(f"❌ Error processing file: {str(e)}")
-            st.info("Please ensure your file is a valid Screaming Frog export with the expected column names.")
+            st.info("💡 Please ensure your file is a valid Screaming Frog export with the expected column names.")
+            
+            with st.expander("🔍 Common Issues & Solutions"):
+                st.write("""
+                **Common file issues:**
+                - File is not from Screaming Frog Internal HTML export
+                - Missing required columns (check export settings)
+                - File format issues (try saving as CSV)
+                - Empty or corrupted file
+                
+                **Solutions:**
+                - Re-export from Screaming Frog using Internal HTML tab
+                - Ensure all columns are included in export
+                - Try uploading as CSV format
+                """)
 
     else:
         # Instructions when no file is uploaded
-        st.info("👆 Please upload a Screaming Frog CSV or Excel file to begin the analysis.")
+        st.info("👆 Please upload a Screaming Frog CSV or Excel file to begin the SEO analysis.")
         
-        with st.expander("📖 How to export data from Screaming Frog"):
+        # Feature showcase
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            ### 🎯 Content Analysis
+            - Meta title optimization
+            - Meta description analysis
+            - H1 tag evaluation
+            - Internal linking assessment
+            """)
+        
+        with col2:
+            st.markdown("""
+            ### ⚙️ Technical Evaluation
+            - Page response times
+            - Indexability status
+            - Crawl error detection
+            - Server response analysis
+            """)
+        
+        with col3:
+            st.markdown("""
+            ### 👥 User Experience
+            - Mobile friendliness
+            - Core Web Vitals (LCP)
+            - Layout stability (CLS)
+            - Performance metrics
+            """)
+        
+        with st.expander("📖 How to export data from Screaming Frog", expanded=True):
             st.write("""
-            1. Open Screaming Frog SEO Spider
-            2. Crawl your website
-            3. Go to **Bulk Export** > **Response Codes** > **All**
-            4. Choose **Internal HTML** tab
-            5. Export as CSV or Excel
-            6. Upload the file here
+            **Step-by-step instructions:**
+            
+            1. **Open Screaming Frog SEO Spider**
+            2. **Crawl your website** (enter URL and click Start)
+            3. **Wait for crawl to complete**
+            4. **Go to Bulk Export menu** → Response Codes → All
+            5. **Select the Internal HTML tab**
+            6. **Click Export** and save as CSV or Excel
+            7. **Upload the file here** using the file uploader above
+            
+            ✅ **Tip**: Make sure to export from the "Internal HTML" tab for best results!
             """)
 
 if __name__ == "__main__":
