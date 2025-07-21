@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import plotly.graph_objects as go
-import plotly.express as px
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class SEOScorer:
     def __init__(self):
@@ -162,68 +162,83 @@ class SEOScorer:
             return "F"
 
 def create_score_gauge(score, title):
-    """Create a gauge chart for individual scores"""
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number+delta",
-        value = score,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': title, 'font': {'size': 16}},
-        gauge = {
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "darkblue"},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': [
-                {'range': [0, 50], 'color': '#ffcccc'},
-                {'range': [50, 80], 'color': '#fff4cc'},
-                {'range': [80, 100], 'color': '#ccffcc'}
-            ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': 90
-            }
-        }
-    ))
+    """Create a visual score representation using Streamlit components"""
+    # Calculate percentage for progress bar
+    progress_value = score / 100
     
-    fig.update_layout(height=300, margin=dict(l=20, r=20, t=40, b=20))
-    return fig
+    # Color based on score
+    if score >= 80:
+        color = "#28a745"  # Green
+    elif score >= 60:
+        color = "#ffc107"  # Yellow
+    elif score >= 40:
+        color = "#fd7e14"  # Orange
+    else:
+        color = "#dc3545"  # Red
+    
+    # Create a visual gauge using HTML/CSS
+    gauge_html = f"""
+    <div style="text-align: center; padding: 20px;">
+        <h4 style="margin-bottom: 10px; color: #333;">{title}</h4>
+        <div style="position: relative; width: 200px; height: 200px; margin: 0 auto;">
+            <div style="
+                width: 200px; 
+                height: 200px; 
+                border-radius: 50%; 
+                background: conic-gradient({color} {score * 3.6}deg, #e9ecef {score * 3.6}deg);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+            ">
+                <div style="
+                    width: 160px; 
+                    height: 160px; 
+                    background: white; 
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-direction: column;
+                ">
+                    <span style="font-size: 2rem; font-weight: bold; color: {color};">{score}</span>
+                    <span style="font-size: 0.9rem; color: #666;">out of 100</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    return gauge_html
 
 def create_category_breakdown(content_details, technical_details, ux_details):
-    """Create a detailed breakdown chart"""
+    """Create a detailed breakdown using Streamlit's built-in charts"""
     categories = []
     scores = []
-    colors = []
-    
-    scorer = SEOScorer()
+    category_types = []
     
     for metric, score in content_details.items():
-        categories.append(f"Content: {metric.replace('_', ' ').title()}")
+        categories.append(metric.replace('_', ' ').title())
         scores.append(score)
-        colors.append(scorer.get_score_color(score))
+        category_types.append('Content SEO')
     
     for metric, score in technical_details.items():
-        categories.append(f"Technical: {metric.replace('_', ' ').title()}")
+        categories.append(metric.replace('_', ' ').title())
         scores.append(score)
-        colors.append(scorer.get_score_color(score))
+        category_types.append('Technical SEO')
     
     for metric, score in ux_details.items():
-        categories.append(f"UX: {metric.replace('_', ' ').title()}")
+        categories.append(metric.replace('_', ' ').title())
         scores.append(score)
-        colors.append(scorer.get_score_color(score))
+        category_types.append('User Experience')
     
-    fig = px.bar(
-        x=scores, 
-        y=categories, 
-        orientation='h',
-        color=scores,
-        color_continuous_scale=['#dc3545', '#fd7e14', '#ffc107', '#28a745'],
-        title="Detailed Score Breakdown by Metric"
-    )
-    fig.update_layout(height=400, showlegend=False)
-    fig.update_coloraxes(showscale=False)
-    return fig
+    # Create DataFrame for the chart
+    chart_data = pd.DataFrame({
+        'Metric': categories,
+        'Score': scores,
+        'Category': category_types
+    })
+    
+    return chart_data
 
 def main():
     st.set_page_config(
@@ -377,21 +392,39 @@ def main():
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                fig1 = create_score_gauge(content_score, "Content SEO")
-                st.plotly_chart(fig1, use_container_width=True)
+                gauge_html1 = create_score_gauge(content_score, "Content SEO")
+                st.markdown(gauge_html1, unsafe_allow_html=True)
                 
             with col2:
-                fig2 = create_score_gauge(technical_score, "Technical SEO")
-                st.plotly_chart(fig2, use_container_width=True)
+                gauge_html2 = create_score_gauge(technical_score, "Technical SEO")
+                st.markdown(gauge_html2, unsafe_allow_html=True)
                 
             with col3:
-                fig3 = create_score_gauge(ux_score, "User Experience")
-                st.plotly_chart(fig3, use_container_width=True)
+                gauge_html3 = create_score_gauge(ux_score, "User Experience")
+                st.markdown(gauge_html3, unsafe_allow_html=True)
 
             # Detailed breakdown chart
             st.header("🔍 Metric Breakdown")
-            breakdown_fig = create_category_breakdown(content_details, technical_details, ux_details)
-            st.plotly_chart(breakdown_fig, use_container_width=True)
+            chart_data = create_category_breakdown(content_details, technical_details, ux_details)
+            st.bar_chart(chart_data.set_index('Metric')['Score'])
+            
+            # Show the data in a more detailed way
+            st.subheader("📊 Detailed Metrics Table")
+            
+            # Color code the scores in the dataframe display
+            def color_scores(val):
+                if val >= 80:
+                    color = '#d4edda'  # Light green
+                elif val >= 60:
+                    color = '#fff3cd'  # Light yellow
+                elif val >= 40:
+                    color = '#f8d7da'  # Light red
+                else:
+                    color = '#f5c6cb'  # Darker red
+                return f'background-color: {color}'
+            
+            styled_df = chart_data.style.applymap(color_scores, subset=['Score'])
+            st.dataframe(styled_df, use_container_width=True)
 
             # Category summaries with improved styling
             st.header("📋 Detailed Analysis")
