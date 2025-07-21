@@ -228,6 +228,126 @@ def get_score_status(score):
     else:
         return "❌ Needs Work"
 
+def create_export_data(overall_score, content_score, technical_score, ux_score, 
+                      content_details, technical_details, ux_details,
+                      content_weaknesses, technical_weaknesses, ux_weaknesses,
+                      df, scorer):
+    """Create structured data for export"""
+    
+    # Summary data
+    summary_data = {
+        'Overall Score': overall_score,
+        'Grade': scorer.get_grade(overall_score),
+        'Content SEO Score': content_score,
+        'Technical SEO Score': technical_score,
+        'User Experience Score': ux_score,
+        'Total Pages Analyzed': len(df),
+        'Analysis Date': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    # Detailed metrics
+    all_metrics = {}
+    
+    # Content SEO metrics
+    for metric, score in content_details.items():
+        all_metrics[f"Content SEO - {metric.replace('_', ' ').title()}"] = score
+    
+    # Technical SEO metrics  
+    for metric, score in technical_details.items():
+        all_metrics[f"Technical SEO - {metric.replace('_', ' ').title()}"] = score
+        
+    # UX metrics
+    for metric, score in ux_details.items():
+        all_metrics[f"User Experience - {metric.replace('_', ' ').title()}"] = score
+    
+    # Issues and recommendations
+    issues_data = {
+        'Content SEO Issues': '; '.join(content_weaknesses) if content_weaknesses else 'No issues detected',
+        'Technical SEO Issues': '; '.join(technical_weaknesses) if technical_weaknesses else 'No issues detected', 
+        'User Experience Issues': '; '.join(ux_weaknesses) if ux_weaknesses else 'No issues detected'
+    }
+    
+    # Additional stats
+    if 'Indexability' in df.columns:
+        indexable_pages = df[df['Indexability'] == 'Indexable'].shape[0]
+        indexable_percentage = round((indexable_pages / len(df)) * 100, 1)
+        summary_data['Indexable Pages'] = indexable_pages
+        summary_data['Indexable Percentage'] = f"{indexable_percentage}%"
+    
+    if 'Response Time' in df.columns:
+        avg_response_time = round(df['Response Time'].mean(), 2)
+        summary_data['Average Response Time (s)'] = avg_response_time
+    
+    return summary_data, all_metrics, issues_data
+
+def create_summary_report(summary_data, all_metrics, issues_data, scorer):
+    """Create a text-based summary report"""
+    
+    report = f"""
+# SEO READINESS ANALYSIS REPORT
+Generated: {summary_data['Analysis Date']}
+
+## EXECUTIVE SUMMARY
+Overall SEO Score: {summary_data['Overall Score']}/100 (Grade: {summary_data['Grade']})
+Status: {get_score_status(summary_data['Overall Score'])}
+
+## CATEGORY BREAKDOWN
+• Content SEO: {summary_data['Content SEO Score']}/100
+• Technical SEO: {summary_data['Technical SEO Score']}/100  
+• User Experience: {summary_data['User Experience Score']}/100
+
+## DETAILED METRICS
+"""
+    
+    # Add all metrics
+    for metric, score in all_metrics.items():
+        status = get_score_status(score)
+        report += f"• {metric}: {score}/100 - {status}\n"
+    
+    report += f"""
+## ISSUES IDENTIFIED
+
+### Content SEO Issues:
+{issues_data['Content SEO Issues']}
+
+### Technical SEO Issues:
+{issues_data['Technical SEO Issues']}
+
+### User Experience Issues:
+{issues_data['User Experience Issues']}
+
+## KEY STATISTICS
+• Total Pages Analyzed: {summary_data['Total Pages Analyzed']:,}
+"""
+    
+    if 'Indexable Pages' in summary_data:
+        report += f"• Indexable Pages: {summary_data['Indexable Pages']:,} ({summary_data['Indexable Percentage']})\n"
+    
+    if 'Average Response Time (s)' in summary_data:
+        report += f"• Average Response Time: {summary_data['Average Response Time (s)']}s\n"
+    
+    # Add recommendations
+    report += f"""
+## RECOMMENDATIONS
+
+### Priority Actions:
+"""
+    
+    # Determine priority based on lowest scores
+    categories = [
+        ("Content SEO", summary_data['Content SEO Score'], "Focus on meta titles, descriptions, and H1 optimization"),
+        ("Technical SEO", summary_data['Technical SEO Score'], "Improve page speed and ensure all pages are indexable"),
+        ("User Experience", summary_data['User Experience Score'], "Optimize Core Web Vitals and mobile experience")
+    ]
+    
+    sorted_categories = sorted(categories, key=lambda x: x[1])
+    
+    for i, (category, score, recommendation) in enumerate(sorted_categories, 1):
+        priority = "HIGH" if score < 60 else "MEDIUM" if score < 80 else "LOW"
+        report += f"{i}. {category} ({score}/100) - {priority} PRIORITY\n   → {recommendation}\n"
+    
+    return report
+
 def create_progress_bar(score, label):
     """Create a styled progress bar"""
     color = "#28a745" if score >= 80 else "#ffc107" if score >= 60 else "#fd7e14" if score >= 40 else "#dc3545"
@@ -568,6 +688,128 @@ def main():
                     st.metric("Avg Response Time", "N/A")
 
             # Additional insights
+            st.markdown("---")
+            
+            # Export Section
+            st.header("📥 Export Results")
+            st.write("Download your SEO analysis results for presentations, reports, or further analysis.")
+            
+            # Prepare export data
+            summary_data, all_metrics, issues_data = create_export_data(
+                overall_score, content_score, technical_score, ux_score,
+                content_details, technical_details, ux_details,
+                content_weaknesses, technical_weaknesses, ux_weaknesses,
+                df, scorer
+            )
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                # Excel Export - Summary + Metrics
+                summary_df = pd.DataFrame([summary_data]).T
+                summary_df.columns = ['Value']
+                summary_df.index.name = 'Metric'
+                
+                metrics_df = pd.DataFrame([all_metrics]).T
+                metrics_df.columns = ['Score']
+                metrics_df.index.name = 'SEO Metric'
+                
+                issues_df = pd.DataFrame([issues_data]).T
+                issues_df.columns = ['Issues Found']
+                issues_df.index.name = 'Category'
+                
+                # Create Excel file in memory
+                from io import BytesIO
+                buffer = BytesIO()
+                
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    summary_df.to_excel(writer, sheet_name='Summary')
+                    metrics_df.to_excel(writer, sheet_name='Detailed Metrics')
+                    issues_df.to_excel(writer, sheet_name='Issues & Recommendations')
+                
+                buffer.seek(0)
+                
+                st.download_button(
+                    label="📊 Download Excel Report",
+                    data=buffer.getvalue(),
+                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    help="Comprehensive Excel report with multiple sheets"
+                )
+            
+            with col2:
+                # CSV Export - All data combined
+                export_df = pd.DataFrame({
+                    'Category': ['Summary'] * len(summary_data) + ['Metrics'] * len(all_metrics) + ['Issues'] * len(issues_data),
+                    'Item': list(summary_data.keys()) + list(all_metrics.keys()) + list(issues_data.keys()),
+                    'Value': [str(v) for v in summary_data.values()] + [str(v) for v in all_metrics.values()] + list(issues_data.values())
+                })
+                
+                csv_data = export_df.to_csv(index=False)
+                
+                st.download_button(
+                    label="📋 Download CSV Data",
+                    data=csv_data,
+                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    help="Raw data in CSV format for further analysis"
+                )
+            
+            with col3:
+                # Text Report Export
+                text_report = create_summary_report(summary_data, all_metrics, issues_data, scorer)
+                
+                st.download_button(
+                    label="📄 Download Text Report",
+                    data=text_report,
+                    file_name=f"seo_report_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                    mime="text/plain",
+                    help="Formatted text report for presentations"
+                )
+            
+            with col4:
+                # JSON Export for developers
+                import json
+                json_data = {
+                    'summary': summary_data,
+                    'metrics': all_metrics,
+                    'issues': issues_data,
+                    'metadata': {
+                        'export_timestamp': datetime.now().isoformat(),
+                        'tool_version': '2.0',
+                        'weights': scorer.weights
+                    }
+                }
+                
+                json_string = json.dumps(json_data, indent=2)
+                
+                st.download_button(
+                    label="🔧 Download JSON Data",
+                    data=json_string,
+                    file_name=f"seo_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json",
+                    help="Structured data in JSON format for developers"
+                )
+            
+            # Export instructions
+            with st.expander("💡 How to use exported data in presentations"):
+                st.write("""
+                **For PowerPoint/Google Slides:**
+                - Use the **Text Report** for copy-paste content
+                - Import **Excel charts** directly into slides
+                - Use **CSV data** to create custom charts
+                
+                **For Further Analysis:**
+                - **Excel Report**: Multiple sheets with detailed breakdowns
+                - **CSV Data**: Import into analytics tools
+                - **JSON Data**: For developers and custom integrations
+                
+                **Tips:**
+                - Screenshots of the gauges work great in presentations
+                - The text report includes executive summary and recommendations
+                - Excel file contains multiple tabs for different aspects
+                """)
+
             st.markdown("---")
             st.header("💡 Key Insights")
             
